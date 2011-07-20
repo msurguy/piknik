@@ -62,7 +62,7 @@ $(function() {
         g = Math.floor(g*255).toString(16);
         b = Math.floor(b*255).toString(16);
         
-        return '#' + (r < 0x10 ? '0' : '') + r + (g < 0x10 ? '0' : '') + g + (b < 0x10 ? '0' : '') + b;
+        return '#' + (r.length == 1 ? '0' : '') + r + (g.length == 1 ? '0' : '') + g + (b.length == 1 ? '0' : '') + b;
     };
     
     var updateColor = function() {
@@ -73,25 +73,22 @@ $(function() {
         if (locked) {
             return;
         }
-        
         h = x / width;
-        //s = 1 - (y / height);
-        
-        if (s > 1) {
-            s = 1;
-        }
-        if (s < 0) {
-            s = 0;
-        }
-        
+        s = 1 - (y / height);
         updateColor();
     };
     
-    var changeL = function(evt, delta) {
+    var changeL = function(delta) {
         if (locked) {
             return;
         }
-        
+        l += delta / 100;
+        if (l > 1) {
+            l = 1;
+        }
+        if (l < 0) {
+            l = 0;
+        }
         updateColor();
     };
     
@@ -115,15 +112,17 @@ $(function() {
         $('body').bind('touchstart', function(evt) {
             var startPos = getXY(evt),
                 currentPos = startPos,
-                moved = false;
-            
+                moved = false,
+                deltaX = 0,
+                deltaY = 0,
+                prevDeltaY = 0;
             evt.preventDefault();
             
             $('body').bind('touchmove', function(evt) {
                 evt.preventDefault();
                 currentPos = getXY(evt);
-                var deltaX = startPos[0] - currentPos[0];
-                var deltaY = startPos[1] - currentPos[1];
+                deltaX = startPos[0] - currentPos[0];
+                deltaY = startPos[1] - currentPos[1];
                 if (! moved) {
                     var delta = Math.sqrt((deltaX * deltaX) + (deltaY * deltaY));
                     if (delta > 10) {
@@ -133,9 +132,26 @@ $(function() {
                 
                 if (moved && ! locked) {
                     if (evt.originalEvent.touches && evt.originalEvent.touches.length > 1) {
-                        
+                        changeL(prevDeltaY > deltaY ? -1 : 1);
+                        prevDeltaY = deltaY;
                     } else {
-                        changeHS((origPos[0] + deltaX) % width, (origPos[1] + deltaY));
+                        var newH = origPos[0] - deltaX;
+                        while (newH < 0) {
+                            newH += width;
+                        }
+                        while (newH > width) {
+                            newH -= width;
+                        }
+                        
+                        var newS = origPos[1] - deltaY;
+                        if (newS < 0) {
+                            newS = 0;
+                        }
+                        if (newS > height) {
+                            newS = height;
+                        }
+                        
+                        changeHS(newH, newS);
                     }
                 }
             });
@@ -144,7 +160,7 @@ $(function() {
                 if (! moved) {
                     toggleLock();
                 } else {
-                    origPos = currentPos;
+                    origPos = [origPos[0] - deltaX, origPos[1] - deltaY];
                 }
                 $('body').unbind('touchmove');
                 $('body').unbind('touchend');
@@ -153,7 +169,9 @@ $(function() {
         
     } else {
         
-        $('body').bind('mousewheel', changeL);
+        $('body').bind('mousewheel', function(evt, delta) {
+            changeL(delta);
+        });
         $('body').bind('mousemove', function(evt) {
             changeHS(evt.clientX, evt.clientY);
         });
